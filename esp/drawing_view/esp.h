@@ -1,8 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <QuartzCore/QuartzCore.h>
-#import "../helpers/Vector3.h"
-#import "../helpers/pid.h"
-#import "../unity_api/unity.h"
+#import "../Core/GameLogic.h"
 
 struct ESPBox {
     Vector3 pos;

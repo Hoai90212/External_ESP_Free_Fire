@@ -1,11 +1,16 @@
 #import "esp.h"
 
+#define sWidth  [UIScreen mainScreen].bounds.size.width
+#define sHeight [UIScreen mainScreen].bounds.size.height
+
 @interface ESP_View ()
 @property (nonatomic, strong) NSMutableArray<CALayer *> *layers;
 @property (nonatomic, strong) CADisplayLink *displayLink;
 @property (nonatomic, strong) CADisplayLink *displayLinkDATA;
 @property (nonatomic, strong) NSArray<NSValue *> *boxesData;
 @end
+
+uint64_t Moudule_Base = -1;
 
 @implementation ESP_View
 
@@ -16,9 +21,13 @@
         self.layers = [NSMutableArray array];
         self.backgroundColor = [UIColor clearColor];
 
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            Moudule_Base = (uint64_t)GetGameModule_Base((char*)"freefireth");
+        });
+
         self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(updateBoxes)];
         [self.displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
-        
         
         self.displayLinkDATA = [CADisplayLink displayLinkWithTarget:self selector:@selector(update_data)];
         [self.displayLinkDATA addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
@@ -63,9 +72,7 @@
         [self.layer addSublayer:layer];
         [self.layers addObject:layer];
     }
-    
 
-    
     for (NSUInteger i = 0; i < self.layers.count; i++)
     {
         CALayer *layer = self.layers[i];
@@ -87,8 +94,6 @@
     }
 }
 
-
-
 - (void)dealloc {
     [self.displayLink invalidate];
     [self.displayLinkDATA invalidate];
@@ -96,7 +101,6 @@
     self.displayLinkDATA = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
-
 
 - (void)update_data
 {
@@ -106,32 +110,74 @@
     const NSInteger boxCount = 10;
     const CGFloat baseWidth = 60.0;
     const CGFloat baseHeight = 120.0;
-    
+
     NSMutableArray<NSValue *> *boxesMutable = [NSMutableArray arrayWithCapacity:boxCount];
+    int countObject = 0;
+
+    if (Moudule_Base == -1) return;
+
+    uint64_t matchGame = getMatchGame(Moudule_Base);
+    uint64_t camera = CameraMain(matchGame);
+    if (!isVaildPtr(camera)) return;
+
+    uint64_t match = getMatch(matchGame);
+    if (!isVaildPtr(match)) return;
+
+    uint64_t myPawnObject = getLocalPlayer(match);
+    if (!isVaildPtr(myPawnObject)) return;
     
-    for (NSInteger i = 0; i < boxCount; i++)
-    {
-        double phase = (double)i * 0.7;
+    uint64_t mainCameraTransform = ReadAddr<uint64_t>(myPawnObject + 0x2B0);
+    Vector3 myLocation = getPositionExt(mainCameraTransform);
+    
+    uint64_t player = ReadAddr<uint64_t>(match + 0xC8);
+    uint64_t tValue = ReadAddr<uint64_t>(player + 0x28);
+    int coutValue = ReadAddr<int>(tValue + 0x18);
+    
+    float *matrix = GetViewMatrix(camera);
+
+    for (int i = 0; i < coutValue; i++) {
+        uint64_t PawnObject = ReadAddr<uint64_t>(tValue + 0x20 + 8 * i);
+        if (!isVaildPtr(PawnObject)) continue;
+
+        bool isLocalTeam = isLocalTeamMate(myPawnObject, PawnObject);
+        if (isLocalTeam) continue;
         
-        double nx = sin(t * 0.6 + phase) * 0.5 + 0.5;
-        double ny = cos(t * 0.4 + phase) * 0.5 + 0.5;
+        NSString *Name = GetNickName(PawnObject);
+        if (Name.length == 0) continue;
+
+        int CurHP = get_CurHP(PawnObject);
+        int MaxHP = get_MaxHP(PawnObject);
+
+        Vector3 HeadLocation     = getPositionExt(getHead(PawnObject));
+        HeadLocation.y           += 0.2f;
+
+        Vector3 RightToePos      = getPositionExt(getRightToeNode(PawnObject));
         
-        CGFloat w = baseWidth * (0.7 + 0.3 * sin(t * 0.9 + phase));
-        CGFloat h = baseHeight * (0.7 + 0.3 * cos(t * 0.8 + phase));
+        Vector3 w2sHeadLocation  = WorldToScreen(HeadLocation, matrix, sWidth, sHeight);
+        Vector3 w2sRightToePos   = WorldToScreen(RightToePos, matrix, sWidth, sHeight);
         
-        CGFloat centerX = (CGFloat)nx * size.width;
-        CGFloat centerY = (CGFloat)ny * size.height;
+        float dis = Vector3::Distance(myLocation, HeadLocation);
+        if (dis > 220.0f) continue;
         
-        ESPBox box;
-        box.pos.x = centerX - w * 0.5;
-        box.pos.y = centerY - h * 0.5;
-        box.pos.z = 0.0f;
-        box.width = w;
-        box.height = h;
+        countObject++;
+
+        float boxHeight = abs(w2sHeadLocation.y - w2sRightToePos.y);
+        float boxWidth = boxHeight * 0.5f;
+        float x = w2sHeadLocation.x - boxWidth * 0.5f;
+        float y = w2sHeadLocation.y;
+        CGRect box = CGRectMake(x, y, boxWidth, boxHeight);
+
+        ESPBox espBox;
+        espBox.pos.x = x;
+        espBox.pos.y = y;
+        espBox.width = boxWidth;
+        espBox.height = boxHeight;
         
-        NSValue *val = [NSValue valueWithBytes:&box objCType:@encode(ESPBox)];
+        NSValue *val = [NSValue valueWithBytes:&espBox objCType:@encode(ESPBox)];
         [boxesMutable addObject:val];
     }
+
+    NSLog(@"[Flork] Count: %d", countObject);
     
     self.boxes = boxesMutable;
     [self setNeedsDisplay];

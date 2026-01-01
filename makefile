@@ -12,17 +12,14 @@ APPLICATION_NAME := TrollSpeed
 $(APPLICATION_NAME)_USE_MODULES := 0
 $(APPLICATION_NAME)_FILES += $(wildcard sources/*.mm sources/*.m)
 $(APPLICATION_NAME)_FILES += $(wildcard sources/KIF/*.mm sources/KIF/*.m)
-$(APPLICATION_NAME)_FILES += $(wildcard esp/drawing_view/*.m)
 $(APPLICATION_NAME)_FILES += $(wildcard esp/drawing_view/*.mm)
 $(APPLICATION_NAME)_FILES += $(wildcard esp/drawing_view/*.cpp)
-$(APPLICATION_NAME)_FILES += $(wildcard esp/helpers/*.m)
-$(APPLICATION_NAME)_FILES += $(wildcard esp/helpers/*.mm)
-$(APPLICATION_NAME)_FILES += $(wildcard esp/unity_api/*.m)
-$(APPLICATION_NAME)_FILES += $(wildcard esp/unity_api/*.mm)
+$(APPLICATION_NAME)_FILES += $(wildcard esp/Core/*.mm)
+$(APPLICATION_NAME)_FILES += $(wildcard esp/Core/*.cpp)
 
 sources/KIF/UITouch-KIFAdditions.m_CFLAGS := $(filter-out -mllvm -enable-fco,$(TrollSpeed_CFLAGS))
 
-$(APPLICATION_NAME)_CFLAGS += -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-value -Wno-module-import-in-extern-c -Wunused-but-set-variable
+$(APPLICATION_NAME)_CFLAGS += -fobjc-arc -Wno-deprecated-declarations -Wno-unused-function -Wno-unused-variable -Wno-unused-value -Wno-module-import-in-extern-c -Wunused-but-set-variable
 $(APPLICATION_NAME)_CFLAGS += -Iheaders
 $(APPLICATION_NAME)_CFLAGS += -Isources
 $(APPLICATION_NAME)_CFLAGS += -Isources/KIF
