@@ -21,9 +21,14 @@ jobs:
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
 
+      - name: List available SDKs
+        run: |
+          ls /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
+
       - name: Build ESP
         run: |
           export THEOS=$HOME/theos
+          export SDKVERSION=15.0   # <-- đổi thành SDK có sẵn
           make clean || true
           make package
         env:
