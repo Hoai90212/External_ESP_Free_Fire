@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install wget curl || true
+          brew install wget git curl
 
       - name: Clone Theos
         run: git clone --recursive https://github.com/theos/theos.git $THEOS
@@ -26,37 +26,21 @@ jobs:
       - name: Detect available iOS SDK
         id: sdk
         run: |
-          echo "Available SDKs:"
-          xcodebuild -showsdks
-          # Lấy SDK mới nhất có trên runner (ví dụ: iPhoneOS15.5)
-          SDK_RAW=$(xcodebuild -showsdks | grep -Eo 'iPhoneOS[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
-          if [ -z "$SDK_RAW" ]; then
-            echo "No iPhoneOS SDK found."
-          else
-            # Bỏ prefix 'iPhoneOS' để chỉ lấy số phiên bản (ví dụ 15.5)
-            SDK_VERSION=$(echo "$SDK_RAW" | sed -E 's/^iPhoneOS//')
-            echo "Detected SDK_RAW=$SDK_RAW"
-            echo "Detected SDK_VERSION=$SDK_VERSION"
-            echo "SDK=$SDK_RAW" >> $GITHUB_ENV
-            echo "SDKVERSION=$SDK_VERSION" >> $GITHUB_ENV
-          fi
+          SDK=$(xcodebuild -showsdks | grep -Eo 'iPhoneOS[0-9]+\.[0-9]+' | sort -V | tail -1)
+          echo "Detected SDK: $SDK"
+          echo "THEOS_DEVICE_SDK=$SDK" >> $GITHUB_ENV
 
       - name: Build ESP
         run: |
-          echo "Using SDK: ${SDKVERSION:-(none)}"
-          echo "THEOS is set to: $THEOS"
           make clean || true
-          # If your Makefile needs SDK in a specific variable name, THEOS will pick up SDKVERSION from env
-          make package
+          THEOS_DEVICE_SDK=$THEOS_DEVICE_SDK make package
 
       - name: List packages
-        run: |
-          ls -la packages || true
+        run: ls -l packages/
 
       - name: Upload .tipa
         uses: actions/upload-artifact@v4
         with:
           name: ESP-tipa
           path: packages/*.tipa
-          if-no-files-found: warn
           retention-days: 3
