@@ -1,37 +1,36 @@
-name: Build ESP (.tipa)
+name: "Build ESP (.tipa)"
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build_esp:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout source
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install Theos
+      - name: Setup Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
-        # Theos is a build system for iOS tweaks
-        # Docs: https://github.com/theos/theos :contentReference[oaicite:0]{index=0}
+          echo "export THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      - name: Rename makefile to Makefile
+      - name: Verify Makefile
         run: |
-          if [ -f makefile ]; then mv makefile Makefile; fi
+          if [ ! -f makefile ]; then
+            echo "Makefile not found!"
+            exit 1
+          fi
 
-      - name: Build package
-        env:
-          THEOS: $HOME/theos
+      - name: Build ESP
         run: |
-          export THEOS=$HOME/theos
           make clean || true
           make package
 
-      - name: Upload .tipa
+      - name: Upload .tipa artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ESP-package
+          name: "ESP-tipa"
           path: packages/*.tipa
           retention-days: 3
