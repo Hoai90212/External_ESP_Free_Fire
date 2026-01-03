@@ -1,0 +1,30 @@
+name: Build ESP (.tipa)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+
+      - name: Build package
+        env:
+          THEOS: ${{ runner.home }}/theos
+        run: |
+          make clean || true
+          make package
+
+      - name: Upload .tipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESP-tipafile
+          path: packages/*.tipa
+          retention-days: 3
