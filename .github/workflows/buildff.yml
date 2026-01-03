@@ -21,10 +21,6 @@ jobs:
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
 
-      - name: Rename makefile if needed
-        run: |
-          if [ -f makefile ]; then mv makefile Makefile; fi
-
       - name: Build ESP
         run: |
           export THEOS=$HOME/theos
