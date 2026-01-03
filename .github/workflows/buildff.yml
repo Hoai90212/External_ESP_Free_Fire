@@ -1,88 +1,50 @@
-name: Build .tipa (macOS runner)
+name: Build ESP (.tipa)
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  build_esp:
     runs-on: macos-latest
+
     env:
-      BUILD_CMD: make   # <-- chỉnh nếu repo của bạn cần "make package" hoặc tương tự
+      THEOS: $HOME/theos
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
-      - name: Install Theos (optional)
-        if: env.BUILD_CMD == 'make'
+      - name: Install dependencies
         run: |
-          # Nếu project cần theos để make (Theos trên macOS)
-          git clone --depth=1 https://github.com/theos/theos /usr/local/theos || true
-          echo "THEOS=/usr/local/theos" >> $GITHUB_ENV
+          brew install wget git curl
 
-      - name: Prepare tools
+      - name: Clone Theos
+        run: git clone --recursive https://github.com/theos/theos.git $THEOS
+
+      - name: Detect latest available iOS SDK
+        id: detect_sdk
         run: |
-          brew update || true
-          brew install ldid dpkg || true || true
-
-      - name: Build project
-        run: |
-          set -e
-          echo "Running build command: $BUILD_CMD"
-          $BUILD_CMD
-
-      - name: Locate and package artifact
-        run: |
-          set -e
-          mkdir -p artifacts output
-          # Tìm .ipa
-          IPA=$(find . -type f -name "*.ipa" -maxdepth 6 | head -n 1 || true)
-          # Tìm .app
-          APP=$(find . -type d -name "*.app" -maxdepth 6 | head -n 1 || true)
-          # Tìm .deb
-          DEB=$(find . -type f -name "*.deb" -maxdepth 6 | head -n 1 || true)
-
-          if [ -n "$IPA" ]; then
-            echo "Found ipa: $IPA"
-            cp "$IPA" ./artifacts/YourApp.ipa
-          elif [ -n "$APP" ]; then
-            echo "Found app: $APP"
-            mkdir -p output/Payload
-            cp -R "$APP" output/Payload/
-            (cd output && /usr/bin/zip -r ../artifacts/YourApp.ipa Payload) || exit 1
-          elif [ -n "$DEB" ]; then
-            echo "Found deb: $DEB - extracting to check for .app inside"
-            mkdir -p extracted
-            dpkg-deb -x "$DEB" extracted/
-            APP_IN_DEB=$(find extracted -type d -name "*.app" | head -n 1 || true)
-            if [ -n "$APP_IN_DEB" ]; then
-              echo "Found .app inside deb: $APP_IN_DEB"
-              mkdir -p output/Payload
-              cp -R "$APP_IN_DEB" output/Payload/
-              (cd output && /usr/bin/zip -r ../artifacts/YourApp.ipa Payload) || exit 1
-            else
-              echo "No .app inside .deb — cannot produce .ipa automatically. Uploading .deb for inspection."
-              cp "$DEB" ./artifacts/
-            fi
-          else
-            echo "No .ipa, .app, or .deb found. Listing files:"
-            ls -laR . || true
-            exit 1
+          SDK=$(xcodebuild -showsdks | grep -Eo 'iPhoneOS[0-9]+\.[0-9]+' | sort -V | tail -1)
+          if [ -z "$SDK" ]; then
+            SDK="iPhoneOS15.5" # fallback nếu không detect được
           fi
+          echo "Detected SDK: $SDK"
+          echo "THEOS_DEVICE_SDK=$SDK" >> $GITHUB_ENV
 
-          ls -la artifacts || true
-
-      - name: Rename .ipa to .tipa (if exists)
+      - name: Build ESP package
         run: |
-          set -e
-          if [ -f artifacts/YourApp.ipa ]; then
-            mv artifacts/YourApp.ipa artifacts/YourApp.tipa
-          fi
-          ls -la artifacts || true
+          echo "[*] Using SDK: $THEOS_DEVICE_SDK"
+          make clean || true
+          make package
 
-      - name: Upload artifacts
+      - name: List built packages
+        run: ls -l packages/
+
+      - name: Upload .tipa artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: artifacts/*
+          name: ESP-tipa
+          path: packages/*.tipa
+          retention-days: 3
