@@ -7,6 +7,11 @@ jobs:
   build_esp:
     runs-on: macos-latest
 
+    env:
+      THEOS: $HOME/theos
+      # Nếu muốn cứng, đặt ở đây, ví dụ 15.5
+      # SDKVERSION: 15.5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,21 +23,23 @@ jobs:
           brew install wget git curl
 
       - name: Clone Theos
-        run: |
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+        run: git clone --recursive https://github.com/theos/theos.git $THEOS
 
-      - name: List available SDKs
+      - name: Detect available iOS SDK
+        id: sdk
         run: |
-          ls /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
+          echo "Available SDKs:"
+          xcodebuild -showsdks
+          # Lấy SDK mới nhất có trên runner
+          SDK=$(xcodebuild -showsdks | grep -Eo 'iPhoneOS[0-9]+\.[0-9]+' | sort -V | tail -1)
+          echo "Detected SDK: $SDK"
+          echo "SDKVERSION=$SDK" >> $GITHUB_ENV
 
       - name: Build ESP
         run: |
-          export THEOS=$HOME/theos
-          export SDKVERSION=15.0   # <-- đổi thành SDK có sẵn
+          echo "Using SDK $SDKVERSION"
           make clean || true
           make package
-        env:
-          THEOS: $HOME/theos
 
       - name: List packages
         run: ls -l packages/
