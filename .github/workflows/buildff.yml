@@ -14,17 +14,24 @@ jobs:
       - name: Install Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
+        # Theos is a build system for iOS tweaks
+        # Docs: https://github.com/theos/theos :contentReference[oaicite:0]{index=0}
+
+      - name: Rename makefile to Makefile
+        run: |
+          if [ -f makefile ]; then mv makefile Makefile; fi
 
       - name: Build package
         env:
-          THEOS: ${{ runner.home }}/theos
+          THEOS: $HOME/theos
         run: |
+          export THEOS=$HOME/theos
           make clean || true
           make package
 
       - name: Upload .tipa
         uses: actions/upload-artifact@v4
         with:
-          name: ESP-tipafile
+          name: ESP-package
           path: packages/*.tipa
           retention-days: 3
