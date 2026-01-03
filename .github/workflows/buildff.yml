@@ -9,8 +9,6 @@ jobs:
 
     env:
       THEOS: $HOME/theos
-      # Nếu muốn cứng, đặt ở đây, ví dụ 15.5
-      # SDKVERSION: 15.5
 
     steps:
       - name: Checkout repository
@@ -20,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install wget git curl
+          brew install wget curl || true
 
       - name: Clone Theos
         run: git clone --recursive https://github.com/theos/theos.git $THEOS
@@ -30,23 +28,35 @@ jobs:
         run: |
           echo "Available SDKs:"
           xcodebuild -showsdks
-          # Lấy SDK mới nhất có trên runner
-          SDK=$(xcodebuild -showsdks | grep -Eo 'iPhoneOS[0-9]+\.[0-9]+' | sort -V | tail -1)
-          echo "Detected SDK: $SDK"
-          echo "SDKVERSION=$SDK" >> $GITHUB_ENV
+          # Lấy SDK mới nhất có trên runner (ví dụ: iPhoneOS15.5)
+          SDK_RAW=$(xcodebuild -showsdks | grep -Eo 'iPhoneOS[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
+          if [ -z "$SDK_RAW" ]; then
+            echo "No iPhoneOS SDK found."
+          else
+            # Bỏ prefix 'iPhoneOS' để chỉ lấy số phiên bản (ví dụ 15.5)
+            SDK_VERSION=$(echo "$SDK_RAW" | sed -E 's/^iPhoneOS//')
+            echo "Detected SDK_RAW=$SDK_RAW"
+            echo "Detected SDK_VERSION=$SDK_VERSION"
+            echo "SDK=$SDK_RAW" >> $GITHUB_ENV
+            echo "SDKVERSION=$SDK_VERSION" >> $GITHUB_ENV
+          fi
 
       - name: Build ESP
         run: |
-          echo "Using SDK $SDKVERSION"
+          echo "Using SDK: ${SDKVERSION:-(none)}"
+          echo "THEOS is set to: $THEOS"
           make clean || true
+          # If your Makefile needs SDK in a specific variable name, THEOS will pick up SDKVERSION from env
           make package
 
       - name: List packages
-        run: ls -l packages/
+        run: |
+          ls -la packages || true
 
       - name: Upload .tipa
         uses: actions/upload-artifact@v4
         with:
           name: ESP-tipa
           path: packages/*.tipa
+          if-no-files-found: warn
           retention-days: 3
