@@ -8,31 +8,37 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
-      - name: Setup Theos
+      - name: Install dependencies
+        run: |
+          brew install wget git curl
+
+      - name: Clone Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
-          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-          echo "export THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      - name: Verify Theos
+      - name: Rename makefile if needed
         run: |
-          ls $THEOS/makefiles
-          echo "THEOS is set to $THEOS"
+          if [ -f makefile ]; then mv makefile Makefile; fi
 
       - name: Build ESP
-        working-directory: ${{ github.workspace }}
         run: |
+          export THEOS=$HOME/theos
           make clean || true
           make package
         env:
           THEOS: $HOME/theos
 
+      - name: List packages
+        run: ls -l packages/
+
       - name: Upload .tipa
         uses: actions/upload-artifact@v4
         with:
-          name: External_ESP_Free_Fire
-          path: ./packages/*.tipa
+          name: ESP-tipa
+          path: packages/*.tipa
           retention-days: 3
